@@ -1,6 +1,7 @@
 import '../core/localization/context.dart';
 import 'package:flutter/material.dart';
 import '../core/models/ledger.dart';
+import '../core/input/cents_input_formatter.dart';
 
 Future<bool> confirm(BuildContext context, String message) async =>
     await showDialog<bool>(
@@ -38,8 +39,13 @@ class MoneyField extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 8),
     child: TextFormField(
       controller: controller,
-      decoration: InputDecoration(labelText: label, prefixText: 'RM '),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixText: 'RM ',
+        hintText: '0.00',
+      ),
+      keyboardType: TextInputType.number,
+      inputFormatters: const [CentsInputFormatter()],
       validator: (v) {
         try {
           cents(v ?? '');

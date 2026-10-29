@@ -285,5 +285,6 @@
   "hatch.saveError": "Could not save your hatch. Please retry before continuing.",
   "monster.tap": "Your baby monster. Tap to play together.",
   "monster.loadError": "Your monster artwork could not be loaded. Please reopen the app.",
-  "hatch.preparing": "Preparing your little world…"
+  "hatch.preparing": "Preparing your little world…",
+  "splash.slogan": "Small savings. Big adventures."
 }

@@ -21,14 +21,14 @@ class _OnboardingState extends ConsumerState<Onboarding> {
   int step = 0;
   bool busy = false;
   final form = GlobalKey<FormState>();
-  final opening = TextEditingController(text: '0'),
-      salary = TextEditingController(text: '0'),
+  final opening = TextEditingController(text: '0.00'),
+      salary = TextEditingController(text: '0.00'),
       payday = TextEditingController(text: '25'),
-      target = TextEditingController(text: '0'),
-      goal = TextEditingController(text: '0');
+      target = TextEditingController(text: '0.00'),
+      goal = TextEditingController(text: '0.00');
   DateTime openingDate = day(DateTime.now()), lastSalary = day(DateTime.now());
   bool hasSalary = false;
-  final initialAmount = TextEditingController(text: '0');
+  final initialAmount = TextEditingController(text: '0.00');
   final initialDescription = TextEditingController();
   final initialEntries = <Entry>[];
   DateTime initialDate = day(DateTime.now());
@@ -283,7 +283,7 @@ class _OnboardingState extends ConsumerState<Onboarding> {
                                     description: initialDescription.text.trim(),
                                   ),
                                 );
-                                initialAmount.text = '0';
+                                initialAmount.text = '0.00';
                                 initialDescription.clear();
                               });
                             } catch (e) {

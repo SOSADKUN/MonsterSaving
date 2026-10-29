@@ -1,7 +1,7 @@
 ﻿# Package the supplied artwork without redrawing it.
 Add-Type -AssemblyName System.Drawing
 $projectRoot = Split-Path $PSScriptRoot -Parent
-$sourcePath = Join-Path $projectRoot 'assets\videos\icon.png'
+$sourcePath = Join-Path $projectRoot 'assets\videos\iconbg.png'
 $source = [System.Drawing.Image]::FromFile($sourcePath)
 function Write-LauncherIcon([string]$target, [int]$edge, [bool]$transparent = $false, [double]$padding = 0.04) {
   $format = if ($transparent) { [System.Drawing.Imaging.PixelFormat]::Format32bppArgb } else { [System.Drawing.Imaging.PixelFormat]::Format24bppRgb }
@@ -28,4 +28,15 @@ try {
   $adaptiveDirectory = Join-Path $projectRoot 'android\app\src\main\res\drawable-xxxhdpi'
   New-Item -ItemType Directory -Force $adaptiveDirectory | Out-Null
   Write-LauncherIcon (Join-Path $adaptiveDirectory 'ic_launcher_foreground.png') 432 $true 0.18
+} finally { $source.Dispose() }
+
+# The launch/splash artwork stays separate from the home-screen launcher icon.
+$source = [System.Drawing.Image]::FromFile((Join-Path $projectRoot 'assets\videos\icon.png'))
+try {
+  Write-LauncherIcon (Join-Path $adaptiveDirectory 'splash_logo.png') 800 $true 0
+  Write-LauncherIcon (Join-Path $adaptiveDirectory 'splash_logo_android12.png') 1152 $true 0.166667
+  $iosSplashDirectory = Join-Path $projectRoot 'ios\Runner\Assets.xcassets\LaunchImage.imageset'
+  Write-LauncherIcon (Join-Path $iosSplashDirectory 'LaunchImage.png') 200 $true 0
+  Write-LauncherIcon (Join-Path $iosSplashDirectory 'LaunchImage@2x.png') 400 $true 0
+  Write-LauncherIcon (Join-Path $iosSplashDirectory 'LaunchImage@3x.png') 600 $true 0
 } finally { $source.Dispose() }

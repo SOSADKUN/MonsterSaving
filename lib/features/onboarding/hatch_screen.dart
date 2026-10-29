@@ -30,8 +30,10 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
       saving = false,
       saved = false,
       saveFailed = false;
-  bool _resumePlayback = false, _disposed = false;
+  bool _resumePlayback = false, _disposed = false, _foreground = true;
   int _generation = 0;
+  Future<void>? _introPreparation;
+  bool _hatchRequested = false;
   @override
   void initState() {
     super.initState();
@@ -46,30 +48,40 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
       ready = false;
       failed = false;
       blocked = false;
+      _hatchRequested = false;
     });
     final loading = VideoPlayerController.asset('assets/videos/loading.mp4');
-    final intro = VideoPlayerController.asset('assets/videos/intro.mp4');
     _loading = loading;
-    _intro = intro;
     try {
-      await Future.wait([loading.initialize(), intro.initialize()]);
+      await loading.initialize();
       if (_disposed || generation != _generation) return;
-      await Future.wait([
-        loading.setVolume(0),
-        intro.setVolume(0),
-        loading.setLooping(true),
-        intro.setLooping(false),
-      ]);
-      // Play the supplied intro at its original speed until media completion.
-      final duration = intro.value.duration.inMilliseconds;
-      if (duration <= 0) throw StateError('Invalid intro duration');
-      await intro.setPlaybackSpeed(1.0);
+      await Future.wait([loading.setVolume(0), loading.setLooping(true)]);
       loading.addListener(_videoChanged);
-      intro.addListener(_videoChanged);
       if (!mounted) return;
+      // Software-first Android decoding lets the intro prepare while the egg loops.
+      _introPreparation = _prepareIntro(generation);
       setState(() => ready = true);
       await _play(loading);
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('Hatch loading playback failed: $error\n$stack');
+      if (mounted && generation == _generation) setState(() => failed = true);
+    }
+  }
+
+  Future<void> _prepareIntro(int generation) async {
+    final intro = VideoPlayerController.asset('assets/videos/intro.mp4');
+    _intro = intro;
+    try {
+      await intro.initialize();
+      if (_disposed || generation != _generation) return;
+      await intro.setVolume(0);
+      await intro.setLooping(false);
+      await intro.setPlaybackSpeed(1.0);
+      if (_disposed || generation != _generation) return;
+      intro.addListener(_videoChanged);
+      setState(() {});
+    } catch (error, stack) {
+      debugPrint('Hatch intro preparation failed: $error\n$stack');
       if (mounted && generation == _generation) setState(() => failed = true);
     }
   }
@@ -77,16 +89,21 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
   void _videoChanged() {
     if (!mounted) return;
     final active = phase == HatchPhase.loading ? _loading : _intro;
-    if (phase != HatchPhase.reveal && active?.value.hasError == true) {
+    if (phase != HatchPhase.reveal &&
+        (active?.value.hasError == true || _intro?.value.hasError == true)) {
       setState(() => failed = true);
       return;
     }
-    if (phase == HatchPhase.hatching && _intro!.value.isCompleted) {
+    if (phase == HatchPhase.hatching && _intro?.value.isCompleted == true) {
       _reveal();
     }
   }
 
   Future<void> _play(VideoPlayerController controller) async {
+    if (!_foreground) {
+      _resumePlayback = true;
+      return;
+    }
     try {
       await controller.play();
       if (mounted) setState(() => blocked = false);
@@ -96,13 +113,23 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _hatch() async {
-    if (!ready || phase != HatchPhase.loading || failed) return;
+    if (!ready || phase != HatchPhase.loading || failed || _hatchRequested) {
+      return;
+    }
+    setState(() => _hatchRequested = true);
+    final generation = _generation;
+    // An unusually early tap keeps the loop visible until preparation completes.
+    // Normal taps only start a player that is already initialized and mounted.
+    await _introPreparation;
+    if (_disposed || generation != _generation || failed) return;
+    final intro = _intro;
+    if (intro == null || !intro.value.isInitialized) return;
+    unawaited(_loading!.pause());
     setState(() {
       phase = HatchPhase.hatching;
       blocked = false;
     });
-    unawaited(_loading!.pause());
-    await _play(_intro!);
+    await _play(intro);
   }
 
   void _reveal() {
@@ -139,8 +166,16 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
     _intro = null;
     previousLoading?.removeListener(_videoChanged);
     previousIntro?.removeListener(_videoChanged);
-    if (previousLoading != null) unawaited(previousLoading.dispose());
-    if (previousIntro != null) unawaited(previousIntro.dispose());
+    setState(() {
+      phase = HatchPhase.loading;
+      ready = false;
+      failed = false;
+      blocked = false;
+    });
+    await Future.wait([
+      if (previousLoading != null) previousLoading.dispose(),
+      if (previousIntro != null) previousIntro.dispose(),
+    ]);
     if (!mounted) return;
     setState(() => phase = HatchPhase.loading);
     await _initialize();
@@ -148,6 +183,7 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
     if (phase == HatchPhase.reveal) {
       if (state == AppLifecycleState.resumed) {
         _baby.resumeEngine();
@@ -180,15 +216,63 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Widget _video(VideoPlayerController player) => SizedBox.expand(
-    child: FittedBox(
-      fit: BoxFit.cover,
-      child: SizedBox(
-        width: player.value.size.width,
-        height: player.value.size.height,
-        child: VideoPlayer(player),
+  Widget _video(VideoPlayerController player) => Stack(
+    fit: StackFit.expand,
+    children: [
+      SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: player.value.size.width,
+            height: player.value.size.height,
+            child: VideoPlayer(player),
+          ),
+        ),
       ),
-    ),
+      Positioned(
+        right: 0,
+        bottom: 0,
+        width: 160,
+        height: 64,
+        child: IgnorePointer(
+          child: DecoratedBox(
+            key: const Key('hatch_video_corner_badge'),
+            decoration: const BoxDecoration(
+              color: Color(0xfffff8da),
+              borderRadius: BorderRadius.only(topLeft: Radius.circular(26)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.eco_rounded,
+                    color: Color(0xff46765b),
+                    size: 26,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${context.tr('hatch.titleTop')}\n${context.tr('hatch.titleBottom')}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xff46765b),
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
   );
   Widget _title(BuildContext context, String text, double fontSize) =>
       FittedBox(
@@ -252,8 +336,16 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
                 AnimatedOpacity(
                   opacity: reveal ? 0 : 1,
                   duration: const Duration(milliseconds: 450),
-                  child: _video(
-                    phase == HatchPhase.loading ? _loading! : _intro!,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _video(_loading!),
+                      if (_intro?.value.isInitialized == true)
+                        Opacity(
+                          opacity: phase == HatchPhase.loading ? 0 : 1,
+                          child: _video(_intro!),
+                        ),
+                    ],
                   ),
                 ),
               if (!reveal)
@@ -357,7 +449,7 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
                       Positioned(
                         left: 24,
                         right: 24,
-                        bottom: 24,
+                        bottom: reveal ? 24 : 80,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -433,7 +525,8 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
                                 ),
                                 child: Text(
                                   context.tr(
-                                    phase == HatchPhase.loading
+                                    phase == HatchPhase.loading &&
+                                            !_hatchRequested
                                         ? 'hatch.tapEgg'
                                         : 'hatch.hatching',
                                   ),

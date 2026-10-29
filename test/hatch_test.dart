@@ -12,6 +12,8 @@ import 'package:saving_monster/features/onboarding/hatch_screen.dart';
 import 'support/localization.dart';
 
 class FakeVideoPlayer extends VideoPlayerPlatform {
+  FakeVideoPlayer({this.deferIntro = false});
+  final bool deferIntro;
   final sources = <int, DataSource>{},
       events = <int, StreamController<VideoEvent>>{};
   final loops = <int, bool>{},
@@ -26,19 +28,23 @@ class FakeVideoPlayer extends VideoPlayerPlatform {
     sources[id] = options.dataSource;
     events[id] = StreamController<VideoEvent>.broadcast(
       onListen: () {
-        scheduleMicrotask(
-          () => events[id]!.add(
-            VideoEvent(
-              eventType: VideoEventType.initialized,
-              duration: const Duration(milliseconds: 3042),
-              size: const Size(720, 1280),
-            ),
-          ),
-        );
+        scheduleMicrotask(() {
+          if (!deferIntro || !options.dataSource.asset!.endsWith('intro.mp4')) {
+            initializePlayer(id);
+          }
+        });
       },
     );
     return id;
   }
+
+  void initializePlayer(int id) => events[id]!.add(
+    VideoEvent(
+      eventType: VideoEventType.initialized,
+      duration: const Duration(milliseconds: 3042),
+      size: const Size(720, 1280),
+    ),
+  );
 
   @override
   Stream<VideoEvent> videoEventsFor(int playerId) => events[playerId]!.stream;
@@ -55,6 +61,9 @@ class FakeVideoPlayer extends VideoPlayerPlatform {
 
   @override
   Future<void> play(int playerId) async {
+    if (playing.entries.any((e) => e.key != playerId && e.value)) {
+      throw StateError('Only one video should play at a time');
+    }
     playing[playerId] = true;
   }
 
@@ -126,14 +135,26 @@ void main() {
       final loading = fake.sources.entries
           .singleWhere((e) => e.value.asset!.endsWith('loading.mp4'))
           .key;
-      final intro = fake.sources.entries
-          .singleWhere((e) => e.value.asset!.endsWith('intro.mp4'))
-          .key;
+      expect(fake.sources, hasLength(2));
       expect(fake.loops[loading], isTrue);
       expect(find.byKey(const Key('hatch_egg')), findsOneWidget);
       expect(saved, 0);
+      final intro = fake.sources.entries
+          .singleWhere((e) => e.value.asset!.endsWith('intro.mp4'))
+          .key;
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(fake.playing[intro], isFalse);
+      expect(
+        find.byKey(const Key('hatch_video_corner_badge')),
+        findsNWidgets(2),
+      );
       await tester.tap(find.byKey(const Key('hatch_egg')));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      expect(fake.sources, hasLength(2));
+      expect(fake.disposed, isEmpty);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(fake.playing[loading], isFalse);
       expect(fake.playing[intro], isTrue);
       expect(fake.speeds[intro], 1.0);
@@ -184,4 +205,45 @@ void main() {
       expect(fake.disposed.toSet(), {loading, intro});
     },
   );
+  testWidgets('An early tap keeps the egg visible while the intro preloads', (
+    tester,
+  ) async {
+    final previous = VideoPlayerPlatform.instance;
+    final fake = FakeVideoPlayer(deferIntro: true);
+    VideoPlayerPlatform.instance = fake;
+    addTearDown(() => VideoPlayerPlatform.instance = previous);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HatchScreen(onHatched: () async {}, onContinue: () {}),
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    final loading = fake.sources.entries
+        .singleWhere((e) => e.value.asset!.endsWith('loading.mp4'))
+        .key;
+    final intro = fake.sources.entries
+        .singleWhere((e) => e.value.asset!.endsWith('intro.mp4'))
+        .key;
+    await tester.tap(find.byKey(const Key('hatch_egg')));
+    await tester.pump();
+    expect(fake.playing[loading], isTrue);
+    expect(fake.playing[intro], isNot(isTrue));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    fake.initializePlayer(intro);
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    expect(fake.playing[loading], isFalse);
+    expect(fake.playing[intro], isTrue);
+    expect(fake.sources, hasLength(2));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+  });
 }

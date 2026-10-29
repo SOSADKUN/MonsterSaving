@@ -2,7 +2,7 @@
 
 Output: `assets/images/monster/baby_atlas.png` (2172 × 724 RGBA); individual crop bounds are in `baby_atlas.json`. Runtime displays one SpriteComponent frame at a time. Measured transparent bounds keep the entire tail, horns and sprout intact. The atlas contains existing idle, happy and sad poses; it is not used as a full homepage illustration.
 
-Source: the character reference sheet attached by the user. Preparation mode: built-in image_gen, background-extraction / identity-preserve. The supplied `assets/videos/icon.png` is used separately as the launcher icon and was not used as the Baby sprite reference. Icon packaging only resizes/composites that supplied artwork; `tool/generate_icons.ps1` regenerates all platform sizes.
+Source: the character reference sheet attached by the user. Preparation mode: built-in image_gen, background-extraction / identity-preserve. The supplied `assets/videos/icon.png` is now used for the startup splash; `assets/videos/iconbg.png` is the launcher icon. Neither was used as the Baby sprite reference. Icon packaging only resizes/composites the supplied artwork; `tool/generate_icons.ps1` regenerates platform icons and native splash images.
 
 Only Baby artwork was supplied. Higher levels keep this approved Baby with stage aura/size accents; fully distinct evolved character art can replace it when supplied. Idle breathing, the existing closed-eye happy pose, tap reactions, sad mood and shop props are controlled in Flame.
 

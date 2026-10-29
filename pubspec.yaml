@@ -25,6 +25,10 @@ dependencies:
   timezone: ^0.10.1
   flutter_timezone: ^4.1.1
   video_player: ^2.11.1
+dependency_overrides:
+  # Android software-first decoding for devices with broken vendor AVC decoders.
+  video_player_android:
+    path: packages/video_player_android
 dev_dependencies:
   video_player_platform_interface: ^6.9.0
   flutter_test:
@@ -43,4 +47,5 @@ flutter:
     - assets/i18n/
     - assets/videos/loading.mp4
     - assets/videos/intro.mp4
+    - assets/videos/icon.png
     - assets/images/monster/

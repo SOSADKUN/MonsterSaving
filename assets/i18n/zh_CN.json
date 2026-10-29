@@ -285,5 +285,6 @@
   "hatch.saveError": "无法保存孵化进度，请重试后再继续。",
   "monster.tap": "你的小怪兽，点击和它一起玩。",
   "monster.loadError": "暂时无法加载小怪兽图片，请重新打开应用。",
-  "hatch.preparing": "正在准备你的小世界……"
+  "hatch.preparing": "正在准备你的小世界……",
+  "splash.slogan": "每天存一点，开启大冒险。"
 }
