@@ -1,0 +1,25 @@
+{
+  "image": "baby_atlas.png",
+  "width": 2172,
+  "height": 724,
+  "frames": {
+    "idle": {
+      "x": 44,
+      "y": 12,
+      "width": 712,
+      "height": 698
+    },
+    "happy": {
+      "x": 770,
+      "y": 49,
+      "width": 637,
+      "height": 661
+    },
+    "sad": {
+      "x": 1519,
+      "y": 59,
+      "width": 607,
+      "height": 642
+    }
+  }
+}

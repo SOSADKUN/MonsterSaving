@@ -1,0 +1,7 @@
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+/sqlite3.wasm
+  Content-Type: application/wasm
+/assets/assets/videos/*.mp4
+  Content-Type: video/mp4
