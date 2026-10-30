@@ -5,6 +5,12 @@ Validated SDK: Flutter 3.41.9 stable, Dart 3.11.5. Dependencies are pinned by pu
 
 ## Run
 
+### GitHub Pages
+
+In repository Settings > Pages, choose GitHub Actions as the source. Commit and push `.github/workflows/deploy-web.yml` along with the app source and `tool/build_web.dart`. The workflow installs Flutter 3.41.9, resolves dependencies, builds the app and offline bundle with the Pages base path, and publishes only pushes/manual runs on the repository's default branch. The Actions run is named "Deploy Saving Monster Web". No local builds or tests were run while adding this workflow; GitHub performs the deployment build after you push.
+
+For `SOSADKUN/MonsterSaving`, the default URL is `https://sosadkun.github.io/MonsterSaving/`. A green deployment is required before opening it. GitHub Pages ignores `web/_headers`: the current database can use safe browser fallbacks where available, but rejects unsafe/in-memory fallbacks (notably Android Chrome without cross-origin isolation). This workflow does not add a cross-origin-isolation workaround. Use a host supporting the supplied COOP/COEP headers for broader browser storage support.
+
 Put the Flutter SDK on PATH, then:
 
 ```sh

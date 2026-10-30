@@ -3,10 +3,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> arguments) async {
   final build = await Process.start(
     'flutter',
-    ['build', 'web', '--release', '--no-web-resources-cdn'],
+    [
+      'build',
+      'web',
+      '--release',
+      '--no-web-resources-cdn',
+      ...arguments,
+    ],
     runInShell: true,
     mode: ProcessStartMode.inheritStdio,
   );
