@@ -1,0 +1,15 @@
+{
+  "image": "hamster_atlas.png",
+  "width": 1774,
+  "height": 887,
+  "frames": {
+    "idle": {"x": 65, "y": 24, "width": 342, "height": 406},
+    "happy": {"x": 511, "y": 22, "width": 367, "height": 416},
+    "sad": {"x": 947, "y": 38, "width": 326, "height": 393},
+    "walk1": {"x": 1370, "y": 28, "width": 362, "height": 411},
+    "walk2": {"x": 69, "y": 452, "width": 357, "height": 394, "heightFactor": 0.98, "flipX": true},
+    "eat": {"x": 526, "y": 464, "width": 326, "height": 386, "heightFactor": 0.95},
+    "sleep": {"x": 943, "y": 469, "width": 333, "height": 381, "heightFactor": 0.94},
+    "blink": {"x": 1380, "y": 452, "width": 345, "height": 407}
+  }
+}

@@ -10,7 +10,12 @@ enum BabyMood { idle, happy, sad }
 /// All character artwork comes from the transparent official-reference atlas.
 /// Primitive components below are only scenery, evolution accents and shop props.
 class MonsterGame extends FlameGame with TapCallbacks {
-  MonsterGame({this.transparentBackground = false, this.onReady});
+  MonsterGame({
+    this.transparentBackground = false,
+    this.onReady,
+    this.manifestName = 'baby_atlas',
+  });
+  final String manifestName;
   final bool transparentBackground;
   final void Function()? onReady;
   int stage = 0;
@@ -40,7 +45,7 @@ class MonsterGame extends FlameGame with TapCallbacks {
     final manifest =
         jsonDecode(
               await images.bundle.loadString(
-                'assets/images/monster/baby_atlas.json',
+                'assets/images/monster/$manifestName.json',
               ),
             )
             as Map<String, dynamic>;

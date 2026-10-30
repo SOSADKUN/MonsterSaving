@@ -16,10 +16,12 @@ import 'language_setting.dart';
 
 class SettingsPanel extends ConsumerStatefulWidget {
   final VoidCallback onHistory, onSalary;
+  final bool salaryPending;
   const SettingsPanel({
     super.key,
     required this.onHistory,
     required this.onSalary,
+    this.salaryPending = false,
   });
   @override
   ConsumerState<SettingsPanel> createState() => _SettingsPanelState();
@@ -158,6 +160,11 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
       l.fingerprints = restored.fingerprints;
       l.inventory = restored.inventory;
       l.equipped = restored.equipped;
+      l.background = restored.background;
+      l.backgroundPurchases = Map.from(restored.backgroundPurchases);
+      l.activeCompanion = restored.activeCompanion;
+      l.companions = Set.from(restored.companions);
+      l.companionPurchases = Map.from(restored.companionPurchases);
     });
     if (mounted) {
       final p = restored.profile;
@@ -179,6 +186,20 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.salaryPending)
+          Card(
+            child: ListTile(
+              leading: const Badge(
+                backgroundColor: Colors.red,
+                child: Icon(Icons.payments_outlined),
+              ),
+              title: Text(context.tr('salary.pending')),
+              trailing: TextButton(
+                onPressed: busy ? null : widget.onSalary,
+                child: Text(context.tr('salary.received')),
+              ),
+            ),
+          ),
         const LanguageSetting(),
         const TngPhoneSetup(),
         const ReminderSettings(),
@@ -205,10 +226,6 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         FilledButton(
           onPressed: busy ? null : save,
           child: Text(context.tr('settings.019')),
-        ),
-        OutlinedButton(
-          onPressed: busy ? null : widget.onSalary,
-          child: Text(context.tr('settings.020')),
         ),
         OutlinedButton(
           onPressed: busy ? null : widget.onHistory,
@@ -245,6 +262,11 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                         l.fingerprints.clear();
                         l.inventory.clear();
                         l.equipped = '';
+                        l.background = 'meadow';
+                        l.backgroundPurchases.clear();
+                        l.activeCompanion = 'dinosaur';
+                        l.companions = {'dinosaur'};
+                        l.companionPurchases.clear();
                       });
                     });
                   }

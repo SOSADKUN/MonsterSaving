@@ -4,6 +4,23 @@ import '../../app/state.dart';
 import '../../app/widgets.dart';
 import '../../core/localization/context.dart';
 
+class LanguageIconButton extends StatelessWidget {
+  const LanguageIconButton({super.key});
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: context.tr('language.label'),
+    icon: const Icon(Icons.language),
+    onPressed: () => showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => const SafeArea(
+        child: Padding(padding: EdgeInsets.all(16), child: LanguageSetting()),
+      ),
+    ),
+  );
+}
+
 class LanguageSetting extends ConsumerStatefulWidget {
   const LanguageSetting({super.key});
   @override

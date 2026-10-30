@@ -81,7 +81,14 @@ class _HistoryPanelState extends ConsumerState<HistoryPanel> {
                 tooltip: context.tr('history.003'),
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () async {
-                  if (await confirm(context, context.tr('history.004'))) {
+                  if (await confirm(
+                    context,
+                    context.tr(
+                      e.includedInOpeningBalance
+                          ? 'history.deleteIncluded'
+                          : 'history.004',
+                    ),
+                  )) {
                     try {
                       await ref
                           .read(ledgerProvider.notifier)

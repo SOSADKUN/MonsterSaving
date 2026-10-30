@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/localization/context.dart';
 import '../monster/monster_game.dart';
+import '../monster/companion_catalog.dart';
 import '../monster/monster_scene.dart';
+import '../monster/background_catalog.dart';
 import '../settings/language_setting.dart';
+import '../startup/startup_screen.dart';
 
 enum HatchPhase { loading, hatching, reveal }
 
@@ -13,9 +16,11 @@ class HatchScreen extends StatefulWidget {
     super.key,
     required this.onHatched,
     required this.onContinue,
+    this.companion = 'dinosaur',
   });
   final Future<void> Function() onHatched;
   final VoidCallback onContinue;
+  final String companion;
   @override
   State<HatchScreen> createState() => _HatchScreenState();
 }
@@ -34,12 +39,33 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
   int _generation = 0;
   Future<void>? _introPreparation;
   bool _hatchRequested = false;
+  bool _backgroundPrepared = false;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _baby = MonsterGame(transparentBackground: true, onReady: _recordHatch);
+    _baby = MonsterGame(
+      transparentBackground: true,
+      onReady: _recordHatch,
+      manifestName: CompanionCatalog.manifests(widget.companion).first,
+    );
     _initialize();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_backgroundPrepared) {
+      _backgroundPrepared = true;
+      unawaited(
+        precacheImage(
+          const AssetImage(HabitatBackground.defaultAsset),
+          context,
+          onError: (error, stack) =>
+              debugPrint('Monster background could not load: $error'),
+        ),
+      );
+    }
   }
 
   Future<void> _initialize() async {
@@ -60,8 +86,9 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       // Software-first Android decoding lets the intro prepare while the egg loops.
       _introPreparation = _prepareIntro(generation);
-      setState(() => ready = true);
       await _play(loading);
+      if (_disposed || generation != _generation) return;
+      setState(() => ready = true);
     } catch (error, stack) {
       debugPrint('Hatch loading playback failed: $error\n$stack');
       if (mounted && generation == _generation) setState(() => failed = true);
@@ -316,6 +343,11 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final reveal = phase == HatchPhase.reveal;
+    // Keep the same full-screen splash through data and video preparation.
+    // The egg page only replaces it once the initialized loop can play.
+    if (!ready && !failed && !reveal) {
+      return const StartupScreen();
+    }
     return Scaffold(
       body: Center(
         child: ConstrainedBox(
@@ -332,6 +364,10 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
+              if (reveal)
+                const Positioned.fill(
+                  child: HabitatBackdrop(background: HabitatBackground.meadow),
+                ),
               if (ready && !failed)
                 AnimatedOpacity(
                   opacity: reveal ? 0 : 1,
@@ -412,8 +448,6 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      if (!ready && !failed)
-                        const Center(child: CircularProgressIndicator()),
                       if (!reveal &&
                           !failed &&
                           ready &&
@@ -469,7 +503,7 @@ class _HatchScreenState extends State<HatchScreen> with WidgetsBindingObserver {
                               ),
                             ] else if (reveal) ...[
                               Text(
-                                context.tr('hatch.welcome'),
+                                '${context.tr('hatch.welcome')}\n${context.tr('companions.${widget.companion}')}',
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontSize: 22,

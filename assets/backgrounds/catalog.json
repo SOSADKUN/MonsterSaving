@@ -1,0 +1,11 @@
+{
+  "items": [
+    {
+      "id": "meadow",
+      "name": {"en": "Mint meadow", "zh_CN": "薄荷草地"},
+      "price": 0,
+      "asset": "assets/videos/background.png",
+      "colors": ["DCEFE3", "F2F6DA"]
+    }
+  ]
+}

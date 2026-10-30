@@ -94,6 +94,7 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
           source: e?.source ?? 'manual',
           fingerprint: e?.fingerprint ?? '',
           importData: e?.importData,
+          includedInOpeningBalance: e?.includedInOpeningBalance ?? false,
         );
         l.entries.removeWhere((t) => t.id == item.id);
         l.entries.add(item);
@@ -130,41 +131,55 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
                   : context.tr('transaction_form.005'),
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            MoneyField(amount, context.tr('transaction_form.006')),
-            DropdownButtonFormField<String>(
-              initialValue: method,
-              decoration: InputDecoration(
-                labelText: context.tr('transaction_form.007'),
+            if (widget.entry?.includedInOpeningBalance == true)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(context.tr('transaction_form.includedInBalance')),
               ),
-              items:
-                  ['TNG', 'Public Bank', 'Cash', 'Card', 'Other Bank', 'Other']
-                      .map(
-                        (m) => DropdownMenuItem(
-                          value: m,
-                          child: Text(paymentLabel(m)),
-                        ),
-                      )
-                      .toList(),
-              onChanged: (v) => method = v!,
-            ),
+            MoneyField(amount, context.tr('transaction_form.006')),
+            if (widget.type != 'salary')
+              DropdownButtonFormField<String>(
+                initialValue: method,
+                decoration: InputDecoration(
+                  labelText: context.tr('transaction_form.007'),
+                ),
+                items:
+                    [
+                          'TNG',
+                          'Public Bank',
+                          'Cash',
+                          'Card',
+                          'Other Bank',
+                          'Other',
+                        ]
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m,
+                            child: Text(paymentLabel(m)),
+                          ),
+                        )
+                        .toList(),
+                onChanged: (v) => method = v!,
+              ),
             DateField(
               value: date,
               onChanged: (d) => setState(() => date = d),
               label: context.tr('transaction_form.008'),
             ),
-            TextFormField(
-              controller: description,
-              validator: (v) =>
-                  widget.type == 'income' && (v == null || v.trim().isEmpty)
-                  ? context.tr('transaction_form.009')
-                  : null,
-              decoration: InputDecoration(
-                labelText: widget.type == 'income'
-                    ? context.tr('transaction_form.010')
-                    : context.tr('transaction_form.011'),
+            if (widget.type != 'salary')
+              TextFormField(
+                controller: description,
+                validator: (v) =>
+                    widget.type == 'income' && (v == null || v.trim().isEmpty)
+                    ? context.tr('transaction_form.009')
+                    : null,
+                decoration: InputDecoration(
+                  labelText: widget.type == 'income'
+                      ? context.tr('transaction_form.010')
+                      : context.tr('transaction_form.011'),
+                ),
+                maxLength: 300,
               ),
-              maxLength: 300,
-            ),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: busy ? null : save,

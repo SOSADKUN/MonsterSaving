@@ -56,11 +56,22 @@ class TngTransaction {
   };
 }
 
+class TngTableLayout {
+  const TngTableLayout(this.columns, this.orientation, this.headerEnd);
+  final List<double> columns;
+  final int orientation, headerEnd;
+
+  PdfRect orient(PdfRect rect) => switch (orientation) {
+    1 => PdfRect(rect.bottom, -rect.left, rect.top, -rect.right),
+    2 => PdfRect(-rect.top, rect.right, -rect.bottom, rect.left),
+    3 => PdfRect(-rect.right, -rect.bottom, -rect.left, -rect.top),
+    _ => rect,
+  };
+}
+
 class TngParser {
-  static List<TngTransaction> parsePage(
-    PdfPageRawText page,
-    double pageHeight,
-  ) {
+  /// Continuation pages in date-range exports do not repeat the table headers.
+  static TngTableLayout? readLayout(PdfPageRawText page) {
     final text = page.fullText;
     const headers = [
       'Date',
@@ -72,40 +83,56 @@ class TngParser {
       'Amount (RM)',
       'Wallet Balance',
     ];
-    final start = text.indexOf('Date Status');
-    if (start < 0) throw FormatException(tr('tng_parser.001'));
+    final header = RegExp(r'\bDate\s+Status\b').firstMatch(text);
+    if (header == null) return null;
+    final start = header.start;
     final positions = <int>[];
     var cursor = start;
     for (final h in headers) {
-      final i = text.indexOf(h, cursor);
-      if (i < 0 || i >= page.charRects.length) {
+      final pattern = h.split(' ').map(RegExp.escape).join(r'\s+');
+      final match = RegExp(pattern).firstMatch(text.substring(cursor));
+      final i = match == null ? -1 : cursor + match.start;
+      if (match == null || i < 0 || i >= page.charRects.length) {
         throw FormatException(tr('tng_parser.002'));
       }
       positions.add(i);
-      cursor = i + h.length;
+      cursor = i + match.group(0)!.length;
     }
     final first = page.charRects[positions.first];
     final last = page.charRects[positions.last];
     final dx = last.left - first.left;
     final dy = last.top - first.top;
-    // PDF text boxes remain in unrotated coordinates, including landscape statements.
-    PdfRect orient(PdfRect r) {
-      if (dy.abs() > dx.abs()) {
-        return dy > 0
-            ? PdfRect(r.bottom, -r.left, r.top, -r.right)
-            : PdfRect(-r.top, r.right, -r.bottom, r.left);
-      }
-      return dx >= 0 ? r : PdfRect(-r.right, -r.bottom, -r.left, -r.top);
-    }
-
-    final rects = page.charRects.map(orient).toList();
-    final xs = positions.map((i) => rects[i].left - 2).toList();
+    // Preserve the orientation and column positions across landscape pages.
+    final orientation = dy.abs() > dx.abs()
+        ? (dy > 0 ? 1 : 2)
+        : (dx >= 0 ? 0 : 3);
+    final layout = TngTableLayout(const [], orientation, cursor);
+    final xs = positions
+        .map((i) => layout.orient(page.charRects[i]).left - 2)
+        .toList();
     for (var i = 1; i < xs.length; i++) {
       if (xs[i] <= xs[i - 1]) throw FormatException(tr('tng_parser.003'));
     }
-    final dates = RegExp(r'\b\d{2}/\d{2}/\d{4}\b').allMatches(text).where((m) {
+    return TngTableLayout(List.unmodifiable(xs), orientation, cursor);
+  }
+
+  static List<TngTransaction> parsePage(
+    PdfPageRawText page,
+    double pageHeight, {
+    TngTableLayout? continuationLayout,
+  }) {
+    final text = page.fullText;
+    final ownLayout = readLayout(page);
+    final layout = ownLayout ?? continuationLayout;
+    if (layout == null) throw FormatException(tr('tng_parser.001'));
+    final cursor = ownLayout?.headerEnd ?? 0;
+    final rects = page.charRects.map(layout.orient).toList();
+    final xs = layout.columns;
+    final dates = RegExp(r'\b\d{1,2}/\d{1,2}/\d{4}\b').allMatches(text).where((
+      m,
+    ) {
       final r = rects[m.start];
-      return m.start > cursor && r.left >= xs[0] && r.left < xs[1];
+      return m.start >= cursor && r.left >= xs[0] && r.left < xs[1];
     }).toList();
     if (dates.isEmpty) throw FormatException(tr('tng_parser.004'));
     final result = <TngTransaction>[];
@@ -184,5 +211,55 @@ class TngParser {
       result.add(parsed);
     }
     return result;
+  }
+
+  static ({DateTime start, DateTime end})? readPeriod(String text) {
+    final headerEnd = RegExp(r'\bDate\s+Status\b').firstMatch(text)?.start;
+    final header = text
+        .substring(0, headerEnd ?? (text.length < 4096 ? text.length : 4096))
+        .replaceAll(RegExp(r'\s+'), ' ');
+    final words = RegExp(
+      r'\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})\b',
+    ).firstMatch(header);
+    DateTime date(String day, String month, String year) {
+      final d = int.parse(day), m = int.parse(month), y = int.parse(year);
+      final value = DateTime(y, m, d);
+      if (value.day != d || value.month != m || value.year != y) {
+        throw FormatException(tr('tng_parser.005'));
+      }
+      return value;
+    }
+
+    if (words != null) {
+      const months = {
+        'jan': 1,
+        'feb': 2,
+        'mar': 3,
+        'apr': 4,
+        'may': 5,
+        'jun': 6,
+        'jul': 7,
+        'aug': 8,
+        'sep': 9,
+        'oct': 10,
+        'nov': 11,
+        'dec': 12,
+      };
+      final firstMonth = months[words[2]!.substring(0, 3).toLowerCase()];
+      final lastMonth = months[words[5]!.substring(0, 3).toLowerCase()];
+      if (firstMonth == null || lastMonth == null) return null;
+      return (
+        start: date(words[1]!, '$firstMonth', words[3]!),
+        end: date(words[4]!, '$lastMonth', words[6]!),
+      );
+    }
+    final numeric = RegExp(
+      r'\b(\d{1,2})/(\d{1,2})/(\d{4})\s*[-–]\s*(\d{1,2})/(\d{1,2})/(\d{4})\b',
+    ).firstMatch(header);
+    if (numeric == null) return null;
+    return (
+      start: date(numeric[1]!, numeric[2]!, numeric[3]!),
+      end: date(numeric[4]!, numeric[5]!, numeric[6]!),
+    );
   }
 }

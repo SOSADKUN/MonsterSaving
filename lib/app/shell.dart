@@ -8,9 +8,10 @@ import '../core/models/ledger.dart';
 import '../core/services/finance.dart';
 import '../core/services/nightly_reminder.dart';
 import '../features/onboarding/onboarding.dart';
-import '../features/monster/monster_game.dart';
-import '../features/monster/monster_scene.dart';
+import '../features/startup/startup_screen.dart';
+import '../features/monster/monster_habitat.dart';
 import '../features/transactions/transaction_form.dart';
+import '../features/transactions/salary_receipt_sheet.dart';
 import '../features/transactions/history.dart';
 import '../features/import/import_panel.dart';
 import '../features/settings/settings.dart';
@@ -24,7 +25,6 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
-  final monster = MonsterGame();
   String tab = 'home';
   String? form;
   Entry? editing;
@@ -32,6 +32,22 @@ class _AppShellState extends ConsumerState<AppShell>
   Timer? timer;
   DateTime? recordingDate;
   bool otherQuestion = false;
+  bool _dismissingCoverage = false;
+
+  Future<void> _dismissCoverage(DateTime cycle) async {
+    if (_dismissingCoverage) return;
+    setState(() => _dismissingCoverage = true);
+    try {
+      await ref.read(ledgerProvider.notifier).change((ledger) {
+        ledger.profile!['coverageNoticeDismissedFor'] = dateKey(cycle);
+      });
+    } catch (error) {
+      if (mounted) notice(context, error);
+    } finally {
+      if (mounted) setState(() => _dismissingCoverage = false);
+    }
+  }
+
   void notificationOpened() {
     if (mounted) {
       setState(() {
@@ -86,9 +102,6 @@ class _AppShellState extends ConsumerState<AppShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       setState(() {});
-      monster.resumeEngine();
-    } else {
-      monster.pauseEngine();
     }
   }
 
@@ -179,8 +192,7 @@ class _AppShellState extends ConsumerState<AppShell>
     });
     final state = ref.watch(ledgerProvider);
     return state.when(
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => const StartupScreen(),
       error: (e, st) => Scaffold(
         body: Center(
           child: Padding(
@@ -203,15 +215,13 @@ class _AppShellState extends ConsumerState<AppShell>
           return const Onboarding();
         }
         final f = Finance.calculate(l, DateTime.now());
-        monster.stage = l.stage;
-        monster.equipped = l.equipped;
-        monster.worried = f.available < 0;
         final p = l.profile!;
         final coverage = p['coverage'] as String?;
         final salaryDue =
             (p['salary'] as int) > 0 &&
             (p['lastSalary'] == null ||
-                (p['lastSalary'] as String).compareTo(dateKey(f.start)) < 0) &&
+                (p['lastSalary'] as String).compareTo(dateKey(f.start)) < 0 ||
+                (p['lastSalary'] as String).compareTo(dateKey(f.end)) >= 0) &&
             !l.entries.any(
               (e) =>
                   e.type == 'salary' &&
@@ -221,11 +231,9 @@ class _AppShellState extends ConsumerState<AppShell>
         Widget content;
         if (tab == 'settings') {
           content = SettingsPanel(
+            salaryPending: salaryDue,
             onHistory: () => setState(() => tab = 'history'),
-            onSalary: () => setState(() {
-              tab = 'home';
-              form = 'salary';
-            }),
+            onSalary: () => showSalaryReceiptSheet(context),
           );
         } else if (tab == 'shop') {
           content = const ShopPanel();
@@ -255,9 +263,15 @@ class _AppShellState extends ConsumerState<AppShell>
                     icon: const Icon(Icons.history),
                   ),
                   IconButton(
-                    tooltip: context.tr('shell.008'),
+                    tooltip: salaryDue
+                        ? '${context.tr('shell.008')} · ${context.tr('salary.pending')}'
+                        : context.tr('shell.008'),
                     onPressed: () => setState(() => tab = 'settings'),
-                    icon: const Icon(Icons.settings_outlined),
+                    icon: Badge(
+                      isLabelVisible: salaryDue,
+                      backgroundColor: Colors.red,
+                      child: const Icon(Icons.settings_outlined),
+                    ),
                   ),
                 ],
               ),
@@ -288,7 +302,14 @@ class _AppShellState extends ConsumerState<AppShell>
                 borderRadius: BorderRadius.circular(30),
                 child: SizedBox(
                   height: 300,
-                  child: MonsterScene(game: monster),
+                  child: MonsterHabitat(
+                    key: ValueKey(l.activeCompanion),
+                    companion: l.activeCompanion,
+                    stage: l.stage,
+                    equipped: l.equipped,
+                    worried: f.available < 0,
+                    background: l.background,
+                  ),
                 ),
               ),
               Padding(
@@ -328,44 +349,6 @@ class _AppShellState extends ConsumerState<AppShell>
                 ],
               ),
               const SizedBox(height: 16),
-              if (salaryDue)
-                Card(
-                  child: ListTile(
-                    title: Text(context.tr('shell.020')),
-                    subtitle: Text(context.tr('shell.021')),
-                    trailing: TextButton(
-                      onPressed: () => setState(() => form = 'salary'),
-                      child: Text(context.tr('shell.022')),
-                    ),
-                  ),
-                ),
-              if (coverage == null ||
-                  coverage.compareTo(dateKey(DateTime.now())) < 0)
-                Card(
-                  color: const Color(0xffffefcc),
-                  child: ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: Text(context.tr('shell.023')),
-                    subtitle: Text(context.tr('shell.024')),
-                    onTap: () async {
-                      if (await confirm(context, context.tr('shell.025'))) {
-                        try {
-                          await ref
-                              .read(ledgerProvider.notifier)
-                              .change(
-                                (l) => l.profile!['coverage'] = dateKey(
-                                  DateTime.now(),
-                                ),
-                              );
-                        } catch (e) {
-                          if (context.mounted) {
-                            notice(context, e);
-                          }
-                        }
-                      }
-                    },
-                  ),
-                ),
               if (otherQuestion)
                 Card(
                   child: Padding(
@@ -489,6 +472,29 @@ class _AppShellState extends ConsumerState<AppShell>
                   ),
                 ),
               ],
+              if (form == null &&
+                  !otherQuestion &&
+                  (coverage == null ||
+                      coverage.compareTo(dateKey(DateTime.now())) < 0) &&
+                  p['coverageNoticeDismissedFor'] != dateKey(f.start))
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Card(
+                    color: const Color(0xffffefcc),
+                    child: ListTile(
+                      leading: const Icon(Icons.info_outline),
+                      title: Text(context.tr('shell.023')),
+                      subtitle: Text(context.tr('shell.024')),
+                      trailing: IconButton(
+                        tooltip: context.tr('common.dismiss'),
+                        icon: const Icon(Icons.close),
+                        onPressed: _dismissingCoverage
+                            ? null
+                            : () => _dismissCoverage(f.start),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           );
         }

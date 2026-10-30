@@ -1,7 +1,7 @@
 name: saving_monster
 description: Local-first savings companion.
 publish_to: none
-version: 0.0.1+1
+version: 0.0.1+2
 environment:
   sdk: ^3.11.0
 dependencies:
@@ -48,4 +48,6 @@ flutter:
     - assets/videos/loading.mp4
     - assets/videos/intro.mp4
     - assets/videos/icon.png
+    - assets/videos/background.png
     - assets/images/monster/
+    - assets/backgrounds/

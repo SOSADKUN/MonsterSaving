@@ -33,7 +33,8 @@ class Finance {
       if (d.isAfter(today)) {
         continue;
       }
-      if (!d.isBefore(DateTime.parse(p['openingDate']))) {
+      if (!e.includedInOpeningBalance &&
+          !d.isBefore(DateTime.parse(p['openingDate']))) {
         balance += e.type == 'expense' ? -e.amount : e.amount;
       }
       if (!d.isBefore(start) && d.isBefore(end)) {

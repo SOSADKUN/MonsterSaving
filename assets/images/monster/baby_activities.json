@@ -1,0 +1,11 @@
+{
+  "image": "baby_activities.png",
+  "width": 2172,
+  "height": 724,
+  "frames": {
+    "walk1": {"x": 23, "y": 47, "width": 527, "height": 626, "heightFactor": 1.0},
+    "walk2": {"x": 585, "y": 55, "width": 515, "height": 615, "heightFactor": 0.98},
+    "eat": {"x": 1134, "y": 95, "width": 495, "height": 572, "heightFactor": 0.92},
+    "sleep": {"x": 1657, "y": 102, "width": 483, "height": 567, "heightFactor": 0.90}
+  }
+}

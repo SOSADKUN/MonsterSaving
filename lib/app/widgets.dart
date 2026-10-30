@@ -58,32 +58,98 @@ class MoneyField extends StatelessWidget {
   );
 }
 
-class DateField extends StatelessWidget {
+class DateField extends StatefulWidget {
   final DateTime value;
   final ValueChanged<DateTime> onChanged;
   final String label;
+  final DateTime? lastDate;
   const DateField({
     super.key,
     required this.value,
     required this.onChanged,
     required this.label,
+    this.lastDate,
   });
   @override
-  Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    title: Text(label),
-    subtitle: Text(dateKey(value)),
-    trailing: const Icon(Icons.calendar_month),
-    onTap: () async {
-      final d = await showDatePicker(
+  State<DateField> createState() => _DateFieldState();
+}
+
+class _DateFieldState extends State<DateField> {
+  bool _open = false;
+
+  Future<void> _pick() async {
+    if (_open) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _open = true);
+    try {
+      final chosen = await showModalBottomSheet<DateTime>(
         context: context,
-        initialDate: value,
-        firstDate: DateTime(2000),
-        lastDate: DateTime.now(),
+        showDragHandle: true,
+        useSafeArea: true,
+        isScrollControlled: true,
+        constraints: const BoxConstraints(maxWidth: 560),
+        sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+            ? AnimationStyle.noAnimation
+            : const AnimationStyle(
+                duration: Duration(milliseconds: 160),
+                reverseDuration: Duration(milliseconds: 120),
+              ),
+        builder: (sheetContext) => SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    widget.label,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  CalendarDatePicker(
+                    initialDate: widget.value,
+                    firstDate: DateTime(2000),
+                    lastDate: DateUtils.dateOnly(
+                      widget.lastDate ?? DateTime.now(),
+                    ),
+                    onDateChanged: (date) => Navigator.pop(sheetContext, date),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    child: Text(context.tr('widgets.002')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       );
-      if (d != null) {
-        onChanged(d);
-      }
-    },
+      if (mounted && chosen != null) widget.onChanged(chosen);
+    } finally {
+      if (mounted) setState(() => _open = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(18),
+      child: InputDecorator(
+        isFocused: _open,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          suffixIcon: Icon(
+            Icons.calendar_month,
+            color: _open ? Theme.of(context).colorScheme.primary : null,
+          ),
+        ),
+        child: Text(
+          MaterialLocalizations.of(context).formatMediumDate(widget.value),
+        ),
+      ),
+      onTap: _pick,
+    ),
   );
 }

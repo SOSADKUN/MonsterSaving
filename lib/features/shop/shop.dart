@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/state.dart';
 import '../../app/widgets.dart';
 import '../../core/models/ledger.dart';
+import 'background_shop.dart';
+import 'companion_shop.dart';
 
 class ShopPanel extends ConsumerWidget {
   const ShopPanel({super.key});
@@ -17,6 +19,13 @@ class ShopPanel extends ConsumerWidget {
           style: Theme.of(context).textTheme.headlineMedium,
         ),
         Text(context.tr('shop.002')),
+        const SizedBox(height: 24),
+        const CompanionShop(),
+        const SizedBox(height: 24),
+        Text(
+          context.tr('companions.accessories'),
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         for (final item in Ledger.prices.entries)
           Card(
             child: ListTile(
@@ -59,6 +68,8 @@ class ShopPanel extends ConsumerWidget {
               ),
             ),
           ),
+        const SizedBox(height: 24),
+        const BackgroundShop(),
       ],
     );
   }

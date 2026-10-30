@@ -13,6 +13,7 @@ class TngPhoneSetup extends StatefulWidget {
 class _TngPhoneSetupState extends State<TngPhoneSetup> {
   final phone = TextEditingController();
   bool busy = false, configured = false, editing = false;
+  bool hidden = true;
   @override
   void initState() {
     super.initState();
@@ -22,7 +23,10 @@ class _TngPhoneSetupState extends State<TngPhoneSetup> {
   Future<void> load() async {
     try {
       final n = await TngPhone().read();
-      if (mounted) setState(() => configured = n != null);
+      if (mounted) {
+        if (!editing) phone.text = n ?? '';
+        setState(() => configured = n != null);
+      }
     } catch (_) {
       if (mounted) notice(context, context.tr('tng_phone_setup.001'));
     }
@@ -37,12 +41,14 @@ class _TngPhoneSetupState extends State<TngPhoneSetup> {
   Future<void> save() async {
     setState(() => busy = true);
     try {
-      await TngPhone().save(phone.text);
-      phone.clear();
+      final normalized = TngPhone.normalize(phone.text);
+      await TngPhone().save(normalized);
       if (mounted) {
+        phone.text = normalized;
         setState(() {
           configured = true;
           editing = false;
+          hidden = true;
         });
         widget.onSaved?.call();
         notice(context, context.tr('tng_phone_setup.002'));
@@ -66,28 +72,50 @@ class _TngPhoneSetupState extends State<TngPhoneSetup> {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           Text(context.tr('tng_phone_setup.004')),
-          if (!configured || editing) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: phone,
-              keyboardType: TextInputType.phone,
-              obscureText: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                labelText: context.tr('tng_phone_setup.005'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: phone,
+            keyboardType: TextInputType.phone,
+            obscureText: hidden,
+            readOnly: busy || (configured && !editing),
+            autocorrect: false,
+            enableSuggestions: false,
+            onChanged: (_) {
+              if (!editing) setState(() => editing = true);
+            },
+            decoration: InputDecoration(
+              labelText: context.tr('tng_phone_setup.005'),
+              hintText: context.tr('tng_phone_setup.005'),
+              suffixIcon: IconButton(
+                tooltip: context.tr(
+                  hidden ? 'common.showValue' : 'common.hideValue',
+                ),
+                icon: Icon(
+                  hidden
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                ),
+                onPressed: () => setState(() => hidden = !hidden),
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+          if (!configured || editing)
             FilledButton(
               onPressed: busy ? null : save,
               child: Text(context.tr('tng_phone_setup.006')),
-            ),
-          ] else
+            )
+          else
             Row(
               children: [
                 Expanded(child: Text(context.tr('tng_phone_setup.007'))),
                 TextButton(
-                  onPressed: () => setState(() => editing = true),
+                  onPressed: busy
+                      ? null
+                      : () => setState(() {
+                          editing = true;
+                          hidden = true;
+                        }),
                   child: Text(context.tr('tng_phone_setup.008')),
                 ),
                 TextButton(
@@ -96,7 +124,14 @@ class _TngPhoneSetupState extends State<TngPhoneSetup> {
                       : () async {
                           try {
                             await TngPhone().clear();
-                            if (mounted) setState(() => configured = false);
+                            if (mounted) {
+                              phone.clear();
+                              setState(() {
+                                configured = false;
+                                editing = false;
+                                hidden = true;
+                              });
+                            }
                           } catch (e) {
                             if (context.mounted) notice(context, e);
                           }
@@ -105,6 +140,11 @@ class _TngPhoneSetupState extends State<TngPhoneSetup> {
                 ),
               ],
             ),
+          const SizedBox(height: 8),
+          Text(
+            context.tr('tng_phone_setup.privacy'),
+            style: const TextStyle(color: Colors.black, fontSize: 12),
+          ),
         ],
       ),
     ),
